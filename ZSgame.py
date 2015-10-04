@@ -22,9 +22,7 @@ pygame.mixer.music.load('resources/audio/moonlight.wav')
 pygame.mixer.music.play(-1, 0.0)
 pygame.mixer.music.set_volume(0.25)
 
-
 #define classes
-
 class Arrow:
     def __init__(self,sub,obj):
         self.obj = obj
@@ -49,8 +47,6 @@ class Arrow:
                 
                 return True
         return False
-
-        
 
 class Defence:
     def __init__(self,pos):
@@ -89,7 +85,6 @@ class Defence:
                 return True
         return False
     
-
 class Badguy:
     sp = 1
     health = 30
@@ -116,7 +111,7 @@ class Badguy:
         rect.top=self.y
         return rect
 
-#mean
+#main
 running = 1
 exitcode = 0
 defences = [Defence([50,120])]
