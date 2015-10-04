@@ -1,7 +1,9 @@
 # zsgame
 a simple game based on pygame
+introduction
+http://www.zealseeker.com/archives/zsgame-oo-game-design-based-on-pygame/
 
-## Package required
+## Package requirement
 Python 
 http://www.python.org/
 Pygame
