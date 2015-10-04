@@ -143,8 +143,8 @@ while running:
             badtimer1=35
         else:
             badtimer1+=5
-
-
+            
+    # change difficulty
     if badguyRemain <= 80:
         Badguy.sp =3
     elif badguyRemain <= 150:
@@ -152,7 +152,7 @@ while running:
     if badguyRemain <= 30:
         Badguy.health = 50
         
-    
+    # findEnemy regularly        
     if badtimer % 20 == 0:
         for defence in defences:
             defence.findEnemy(badguys)
@@ -182,9 +182,7 @@ while running:
     textRect = remaintext.get_rect()
     textRect.topright = [635,35]
     screen.blit(remaintext,textRect)
-                                 
-
-        
+    
     pygame.display.flip()    
     for event in pygame.event.get():
         # check if the event is the X button 
@@ -215,8 +213,6 @@ while running:
                     newp = [position[0]-32,position[1]-26]
                     defences.append(Defence(newp))
                     golds -=50
-            
-
     #Win/Lose check
     if lostValue <=0 :
         running = 0
@@ -229,7 +225,6 @@ if exitcode==0:
     screen.blit(gameover, (0,0))
 else:
     screen.blit(youwin, (0,0))
-
 
 while 1:
     for event in pygame.event.get():
