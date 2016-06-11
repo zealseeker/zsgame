@@ -94,7 +94,7 @@ class Badguy:
         self.x   = pos[0]
         self.y   = pos[1]
         self.sp  = Badguy.sp
-        self.img = pygame.image.load("resources/images/badguy.png")
+        self.img = pygame.image.load("resources/images/badguy-1.png")
         
     def moveOut(self):
         self.x += self.sp

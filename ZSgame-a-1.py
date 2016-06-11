@@ -120,7 +120,7 @@ class Badguy:
         self.health_per = 40./self.health
         self.healthbar = healthbar2
         self.health2 = health2
-        self.img = pygame.image.load("resources/images/badguy.png")
+        self.img = pygame.image.load("resources/images/badguy-1.png")
         
     def moveOut(self):
         self.x += self.sp
