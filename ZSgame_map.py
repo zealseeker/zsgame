@@ -41,38 +41,56 @@ def addLayer(layer,zmap_info):
 
 ### Sprites
 map_sprites=[]
+field_sprites = []
 # start
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(20,20,10,10,fill=sge.gfx.Color('white'))
 map_sprites.append(map_sprite)
 # end
 map_sprites.append(map_sprite)
 #  -
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(0,20,50,10,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 
 # ┐
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(0,20,30,10,fill=sge.gfx.Color('black'))
 map_sprite.draw_rectangle(20,20,10,30,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 # ┘
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(0,20,30,10,fill=sge.gfx.Color('black'))
 map_sprite.draw_rectangle(20,0,10,30,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 # ┌
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(20,20,30,10,fill=sge.gfx.Color('black'))
 map_sprite.draw_rectangle(20,20,10,30,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 # └
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(20,20,30,10,fill=sge.gfx.Color('black'))
 map_sprite.draw_rectangle(20,0,10,30,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 # |
-map_sprite=sge.gfx.Sprite(width=50,height=50,origin_x=25,origin_y=25)
+map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(20,0,10,50,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
+
+# FIELDS
+
+P_FIELD_UP = [[0,0,MAP_SCALE,0]]
+P_FIELD_DOWN = [[0,MAP_SCALE-1,MAP_SCALE,MAP_SCALE-1]]
+P_FIELD_LEFT = [[0,0,0,MAP_SCALE]]
+P_FIELD_RIGHT = [[MAP_SCALE-1,0,MAP_SCALE-1,MAP_SCALE]]
+P_FIELDS = [[],P_FIELD_UP,P_FIELD_LEFT,P_FIELD_LEFT+P_FIELD_UP,P_FIELD_DOWN,
+P_FIELD_UP+P_FIELD_DOWN,P_FIELD_LEFT+P_FIELD_DOWN,P_FIELD_UP+P_FIELD_DOWN+P_FIELD_LEFT,P_FIELD_RIGHT,
+P_FIELD_RIGHT+P_FIELD_UP,P_FIELD_LEFT+P_FIELD_RIGHT,P_FIELD_UP+P_FIELD_LEFT+P_FIELD_RIGHT,P_FIELD_RIGHT+P_FIELD_DOWN,
+P_FIELD_UP+P_FIELD_DOWN+P_FIELD_RIGHT,P_FIELD_DOWN+P_FIELD_LEFT+P_FIELD_RIGHT,P_FIELD_UP+P_FIELD_DOWN+P_FIELD_LEFT+P_FIELD_RIGHT]
+for p_field in P_FIELDS:
+    field_sprite=sge.gfx.Sprite(width=MAP_SCALE,height=MAP_SCALE,origin_x=0,origin_y=0)
+    for edge in p_field:
+        field_sprite.draw_line(edge[0],edge[1],edge[2],edge[3],FIELD_OUTLINE_COLOR)
+    field_sprite.draw_rectangle(0,0,MAP_SCALE,MAP_SCALE,fill=FIELD_COLOR)
+    field_sprites.append(field_sprite)

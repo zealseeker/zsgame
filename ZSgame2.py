@@ -48,11 +48,23 @@ class Scene(sge.dsp.Room):
 
     def event_room_start(self):
         coord = zmap_info['start']
-        Badguy.create(MAP_SCALE*coord[1],MAP_SCALE*coord[0],coord[2])
+        Badguy.create(*coord)
+        create_fields()
         for each in zmap_info['turn']:
             Barrier.create(MAP_SCALE*each[1],MAP_SCALE*each[0],each[2])
+        #Field.create(MAP_SCALE*6,MAP_SCALE*6,4)
+    def event_key_press(self, key, char):
+        if key == '1':
+            Dude.create(sge.game.mouse.x,sge.game.mouse.y)
+
+
 
 class Attackter(sge.dsp.Object):
+    def __init__(self,x,y,direction,**kwargs):
+        x=x*MAP_SCALE+MAP_SCALE/2
+        y=y*MAP_SCALE+MAP_SCALE/2
+        self.direction = direction
+        super(Attackter,self).__init__(x,y,**kwargs)
     def hurt(self):
         pass
 
@@ -79,7 +91,6 @@ class Attackter(sge.dsp.Object):
     def event_alarm(self,alarm_id):
         if alarm_id == 'rotate':
             self.image_rotation+=10*self.turning_direction
-            print self.image_rotation
             if self.image_rotation % 90 !=0:
                 self.alarms['rotate']=ROTATE_INTERVAL
 
@@ -95,10 +106,10 @@ class Badguy(Attackter):
     health = 100
     speed = 2
     def __init__(self,x,y,direction):
-        super(Badguy,self).__init__(x,y,sprite=badguy_sprite,
+
+        super(Badguy,self).__init__(x,y,direction,sprite=badguy_sprite,
         checks_collisions=False)
         self.sprite.rotate(180)
-        self.direction = direction
 
 class Barrier(sge.dsp.Object):
     def __init__(self,x,y,b_type):
@@ -145,8 +156,18 @@ class Barrier(sge.dsp.Object):
                         other.turn(TURN_RIGHT)
 
 class Defence(sge.dsp.Object):
+    def __init__(self,*args,**kwarges):
+        kwarges['image_alpha']=50
+        super(Defence,self).__init__(*args,**kwarges)
+
+    deployed=False
+
     def kill(self):
         pass
+    def event_mouse_move(self,x,y):
+        if not self.deployed :
+            self.x = sge.game.mouse.x // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
+            self.y = sge.game.mouse.y // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
 
 class Dude(Defence):
     def __init__(self,x,y):
@@ -160,14 +181,36 @@ class Arrow(Bullet):
     def __init__(self,x,y):
         super(Arrow,self).__init__(x,y,sprite=arrow_sprite)
 
+class Field(sge.dsp.Object):
+    def __init__(self,x,y,f_type):
+        super(Field,self).__init__(x,y,sprite=field_sprites[f_type],
+        checks_collisions=False,tangible=False)
+
+def create_fields():
+    for i,row in enumerate(zmap):
+        for j,col in enumerate(row):
+            if col != 0:
+                bit = 0
+                if i==0 or zmap[i-1][j]==0:
+                    bit+=1
+                if i==MAP_HEIGHT-1 or zmap[i+1][j]==0:
+                    bit+=4
+                if j==0 or zmap[i][j-1]==0:
+                    bit+=2
+                if j==MAP_WIDTH-1 or zmap[i][j+1]==0:
+                    bit+=8
+                Field.create(MAP_SCALE*j,MAP_SCALE*i,bit)
+
 Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # load sprites
 badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
-dudu_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
+dude_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
 arrow_sprite  = sge.gfx.Sprite('bullet',DATA,origin_x=21,origin_y=5)
 hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
 import ZSgame_map
+field_sprites = ZSgame_map.field_sprites
+zmap = ZSgame_map.zmap
 # load background
 zmap_info = {'turn':[]}
 layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
