@@ -21,7 +21,12 @@ for i in range(2,10):
     zmap[4][i]=3
 zmap[2][10]=8
 zmap[3][10]=8
-zmap[4][1]=2
+zmap[4][1]=7
+zmap[3][1]=8
+zmap[2][1]=6
+for i in range(2,9):
+    zmap[2][i]=3
+zmap[2][9]=2
 
 def addLayer(layer,zmap_info):
     for i in range(20):
@@ -30,7 +35,9 @@ def addLayer(layer,zmap_info):
             if zmap[i][j]!=0:
                 layer.append(sge.gfx.BackgroundLayer(map_sprites[zmap[i][j]-1],50*j,50*i,-10000))
             if zmap[i][j]==1:
-                zmap_info['start']=(i,j,DIRECTION_LEFT)
+                zmap_info['start']=(i,j,DIRECTION_RIGHT)
+            if zmap[i][j]>3 and zmap[i][j]<8:
+                zmap_info['turn'].append((i,j,zmap[i][j]))
 
 ### Sprites
 map_sprites=[]
