@@ -1,13 +1,9 @@
 # Use new pygame engine: sge
-import sge,os
+from ZSgame2_init import *
+import os
+
 __version__ = "0.1"
 DATA = os.path.join(os.path.dirname(__file__),"resources","images")
-DIRECTION_LEFT = 3
-DIRECTION_RIGHT = 1
-DIRECTION_UP   = 4
-DIRECTION_DOWN = 2
-TURN_LEFT = -1
-TURN_RIGHT = 1
 game_in_progress = True
 
 class Game(sge.dsp.Game):
@@ -51,7 +47,8 @@ class Scene(sge.dsp.Room):
         super(Scene,self).__init__(background=background)
 
     def event_room_start(self):
-        Badguy.create(10,10)
+        coord = zmap_info['start']
+        Badguy.create(MAP_SCALE*coord[1],MAP_SCALE*coord[0],coord[2])
 
 class Attackter(sge.dsp.Object):
     def hurt(self):
@@ -73,17 +70,24 @@ class Attackter(sge.dsp.Object):
 class Badguy(Attackter):
     health = 100
     xv = 2
-    def __init__(self,x,y):
+    def __init__(self,x,y,direction):
         super(Badguy,self).__init__(x,y,sprite=badguy_sprite,xvelocity=self.xv,
         image_xscale=-1)
+        self.direction = direction
+
+
+
 
 Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # load sprites
-badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10)
+badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
 hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
+import ZSgame_map
 # load background
+zmap_info = {}
 layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
+ZSgame_map.addLayer(layers,zmap_info)
 background = sge.gfx.Background(layers,sge.gfx.Color((85,170,255)))
 sge.game.start_room = Scene()
 
