@@ -47,28 +47,38 @@ class Scene(sge.dsp.Room):
         super(Scene,self).__init__(background=background)
 
     def event_room_start(self):
-        coord = zmap_info['start']
-        Badguy.create(*coord)
-        create_fields()
         for each in zmap_info['turn']:
-
             Barrier.create(*each)
-        #Field.create(MAP_SCALE*6,MAP_SCALE*6,4)
+        self.alarms['add_badguy']=1
+
     def event_key_press(self, key, char):
         if key == '1':
             Dude.create(sge.game.mouse.x,sge.game.mouse.y)
+            create_fields()
+
+    def event_alarm(self,alarm_id):
+        if alarm_id == 'add_badguy':
+            coord = zmap_info['start']
+            Badguy.create(*coord)
+            self.alarms['add_badguy']=120
 
 
 
 class Attackter(sge.dsp.Object):
+    health = 1
+    speed = 0
     def __init__(self,x,y,direction,**kwargs):
         i=x;j=y
         x=j*MAP_SCALE+MAP_SCALE/2
         y=i*MAP_SCALE+MAP_SCALE/2
         self.direction = direction
         super(Attackter,self).__init__(x,y,**kwargs)
-    def hurt(self):
-        pass
+    def hurt(self,obj,dmage):
+        self.health -= dmage
+        print 'I am hurted, current health:',self.health
+        if self.health <= 0:
+            self.destroy()
+        return True
 
     def kill(self):
         pass
@@ -76,7 +86,6 @@ class Attackter(sge.dsp.Object):
     def turn(self,direction):
         self.direction += direction
         self.turning_direction = direction
-        print self.direction
         if self.direction > 4:
             self.direction = 1
         elif self.direction < 1:
@@ -111,7 +120,6 @@ class Badguy(Attackter):
 
         super(Badguy,self).__init__(x,y,direction,sprite=badguy_sprite,
         checks_collisions=False)
-        self.sprite.rotate(180)
 
 class Barrier(sge.dsp.Object):
     def __init__(self,x,y,b_type):
@@ -171,15 +179,14 @@ class Defence(sge.dsp.Object):
         super(Defence,self).__init__(*args,**kwarges)
 
     def kill(self,obj):
-        print 'killing'
+
         return True
 
     def search_enemy(self):
         for obj in sge.game.current_room.objects[:]:
             if isinstance(obj,Badguy):
                 if distance(self.x,self.y,obj.x,obj.y) < self.attack_range:
-                    print self.x,self.y,obj.x,obj.y
-                    print self.attack_range
+
                     self.kill(obj)
                     return True
         return False
@@ -192,6 +199,13 @@ class Defence(sge.dsp.Object):
             self.image_alpha=255
             self.deployed = True
             self.alarms['kill']= self.attack_freq
+            self.x = j * MAP_SCALE
+            self.y = i * MAP_SCALE
+            # hidden FIELDS
+            for obj in sge.game.current_room.objects[:]:
+                if isinstance(obj,Field):
+                    obj.destroy()
+
 
     def event_mouse_move(self,x,y):
         if not self.deployed :
@@ -213,19 +227,48 @@ class Dude(Defence):
     attack_freq = 60
     attack_rage = 40
     def __init__(self,x,y):
-        super(Dude,self).__init__(x,y,sprite=dude_sprite)
+        super(Dude,self).__init__(x,y,sprite=dude_sprite,checks_collisions=False)
+    def kill(self,obj):
+        Arrow.create(self.x,self.y,obj)
 
 class Bullet(sge.dsp.Object):
+    def __init__(self,x,y,obj,**kwargs):
+        super(Bullet,self).__init__(x,y,**kwargs)
+        self.obj = obj
+
     def attact(self):
         pass
 
+    def event_create(self):
+        self.attact(self.obj)
+
 class Arrow(Bullet):
-    def __init__(self,x,y):
-        super(Arrow,self).__init__(x,y,sprite=arrow_sprite)
+    speed = 10
+    dmage = 30
+    def __init__(self,x,y,obj):
+        super(Arrow,self).__init__(x,y,obj,sprite=arrow_sprite)
+        self.attacted = []
+
+    def attact(self,obj):
+        self.angle = math.atan2(self.obj.y-self.y,self.obj.x-self.x)
+        self.image_rotation = self.angle*57.29
+        self.xvelocity=math.cos(self.angle)*self.speed
+        self.yvelocity=math.sin(self.angle)*self.speed
+
+    def event_collision(self,obj,xdirection,ydirection):
+        if isinstance(obj,Attackter):
+            if obj not in self.attacted:
+                obj.hurt(self,self.dmage)
+                self.attacted.append(obj)
+
+    def event_step(self,time_passed, delta_mult):
+        if self.bbox_bottom < 0 or self.bbox_top > sge.game.current_room.height \
+            or self.bbox_right < 0 or self.bbox_left > sge.game.current_room.width:
+            self.destroy()
 
 class Field(sge.dsp.Object):
     def __init__(self,x,y,f_type):
-        super(Field,self).__init__(x,y,sprite=field_sprites[f_type],
+        super(Field,self).__init__(x,y,10,sprite=field_sprites[f_type],
         checks_collisions=False,tangible=False)
 
 def create_fields():
@@ -250,6 +293,7 @@ Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format
      window_icon=None)
 # load sprites
 badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
+badguy_sprite.rotate(180)
 dude_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
 arrow_sprite  = sge.gfx.Sprite('bullet',DATA,origin_x=21,origin_y=5)
 hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
