@@ -1,6 +1,6 @@
 # Use new pygame engine: sge
 from ZSgame2_init import *
-import os,pygame
+import os,pygame,math
 
 __version__ = "0.1"
 DATA = os.path.join(os.path.dirname(__file__),"resources","images")
@@ -51,7 +51,8 @@ class Scene(sge.dsp.Room):
         Badguy.create(*coord)
         create_fields()
         for each in zmap_info['turn']:
-            Barrier.create(MAP_SCALE*each[1],MAP_SCALE*each[0],each[2])
+
+            Barrier.create(*each)
         #Field.create(MAP_SCALE*6,MAP_SCALE*6,4)
     def event_key_press(self, key, char):
         if key == '1':
@@ -61,8 +62,9 @@ class Scene(sge.dsp.Room):
 
 class Attackter(sge.dsp.Object):
     def __init__(self,x,y,direction,**kwargs):
-        x=x*MAP_SCALE+MAP_SCALE/2
-        y=y*MAP_SCALE+MAP_SCALE/2
+        i=x;j=y
+        x=j*MAP_SCALE+MAP_SCALE/2
+        y=i*MAP_SCALE+MAP_SCALE/2
         self.direction = direction
         super(Attackter,self).__init__(x,y,**kwargs)
     def hurt(self):
@@ -113,6 +115,9 @@ class Badguy(Attackter):
 
 class Barrier(sge.dsp.Object):
     def __init__(self,x,y,b_type):
+        i=x;j=y
+        x=j*MAP_SCALE+MAP_SCALE/2
+        y=i*MAP_SCALE+MAP_SCALE/2
         super(Barrier,self).__init__(x,y)
         self.b_type = b_type
 
@@ -156,20 +161,57 @@ class Barrier(sge.dsp.Object):
                         other.turn(TURN_RIGHT)
 
 class Defence(sge.dsp.Object):
+
+    deployed=False
+    attack_freq = 60
+    attack_range = 150
+
     def __init__(self,*args,**kwarges):
         kwarges['image_alpha']=50
         super(Defence,self).__init__(*args,**kwarges)
 
-    deployed=False
+    def kill(self,obj):
+        print 'killing'
+        return True
 
-    def kill(self):
-        pass
+    def search_enemy(self):
+        for obj in sge.game.current_room.objects[:]:
+            if isinstance(obj,Badguy):
+                if distance(self.x,self.y,obj.x,obj.y) < self.attack_range:
+                    print self.x,self.y,obj.x,obj.y
+                    print self.attack_range
+                    self.kill(obj)
+                    return True
+        return False
+
+    def deploy(self):
+        # now only consider size 1
+        i = int(self.y // MAP_SCALE)
+        j = int(self.x // MAP_SCALE)
+        if zmap[i][j]==0:
+            self.image_alpha=255
+            self.deployed = True
+            self.alarms['kill']= self.attack_freq
+
     def event_mouse_move(self,x,y):
         if not self.deployed :
             self.x = sge.game.mouse.x // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
             self.y = sge.game.mouse.y // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
+    def event_mouse_button_press(self,button):
+        if not self.deployed :
+            if button == 'left':
+                self.deploy()
+            elif button == 'right':
+                self.destroy()
+
+    def event_alarm(self,alarm_id):
+        if alarm_id == 'kill':
+            self.search_enemy()
+            self.alarms['kill']= self.attack_freq
 
 class Dude(Defence):
+    attack_freq = 60
+    attack_rage = 40
     def __init__(self,x,y):
         super(Dude,self).__init__(x,y,sprite=dude_sprite)
 
@@ -201,6 +243,9 @@ def create_fields():
                     bit+=8
                 Field.create(MAP_SCALE*j,MAP_SCALE*i,bit)
 
+def distance(x1,y1,x2,y2):
+    return math.sqrt((x1-x2)**2+(y1-y2)**2)
+
 Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # load sprites
@@ -208,6 +253,7 @@ badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
 dude_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
 arrow_sprite  = sge.gfx.Sprite('bullet',DATA,origin_x=21,origin_y=5)
 hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
+
 import ZSgame_map
 field_sprites = ZSgame_map.field_sprites
 zmap = ZSgame_map.zmap
