@@ -3,7 +3,7 @@ from ZSgame2_init import *
 import os,pygame
 
 __version__ = "0.1"
-DATA = os.path.join(os.path.dirname(__file__),"resources","images")
+DATA = os.path.join(os.path.abspath(os.path.dirname(__file__)),"resources","images")
 game_in_progress = True
 
 class Game(sge.dsp.Game):
