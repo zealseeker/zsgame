@@ -45,6 +45,9 @@ class Game(sge.dsp.Game):
 class Scene(sge.dsp.Room):
     def __init__(self,difficulty=0):
         super(Scene,self).__init__(background=background)
+        # Todo load map
+        self.attackers = zmap_info['attacker']
+        self.attackerPoint = 0
 
     def event_room_start(self):
         for each in zmap_info['turn']:
@@ -59,25 +62,33 @@ class Scene(sge.dsp.Room):
     def event_alarm(self,alarm_id):
         if alarm_id == 'add_badguy':
             coord = zmap_info['start']
-            Badguy.create(*coord)
-            self.alarms['add_badguy']=120
+            AttackerDict[self.attackers[self.attackerPoint]].create(*coord)
+            self.attackerPoint+=1
+            if self.attackerPoint == len(self.attackers):
+                # Win
+                self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('youwin',DATA),0,0,10000))
+                # TODO bug: it is not win when the last attacker emergers, but when the last attacker dies.
+            else:
+                self.alarms['add_badguy']=120
 
 
+class Attacker(sge.dsp.Object):
 
-class Attackter(sge.dsp.Object):
-    health = 1
-    speed = 0
     def __init__(self,x,y,direction,**kwargs):
         i=x;j=y
         x=j*MAP_SCALE+MAP_SCALE/2
         y=i*MAP_SCALE+MAP_SCALE/2
         self.direction = direction
-        super(Attackter,self).__init__(x,y,**kwargs)
+        super(Attacker,self).__init__(x,y,**kwargs)
+        self.healthBar = AttackerHealthBar.create(self)
+
     def hurt(self,obj,dmage):
         self.health -= dmage
         print 'I am hurted, current health:',self.health
         if self.health <= 0:
             self.destroy()
+        else:
+            self.healthBar.refresh(self.health)
         return True
 
     def kill(self):
@@ -117,12 +128,15 @@ class Attackter(sge.dsp.Object):
         else :
             self.yvelocity = -1* self.speed*(self.direction-3)
             self.xvelocity = 0
+    def event_destroy(self):
+        self.healthBar.destroy()
 
-class Badguy(Attackter):
+class Badguy(Attacker):
     health = 100
     speed = 2
     def __init__(self,x,y,direction):
-
+        self.max_health = Badguy.health
+        self.health = Badguy.health
         super(Badguy,self).__init__(x,y,direction,sprite=badguy_sprite,
         checks_collisions=False)
 
@@ -135,7 +149,7 @@ class Barrier(sge.dsp.Object):
         self.b_type = b_type
 
     def event_collision(self,other,xdirection,ydirection):
-        if(isinstance(other,Attackter)):
+        if(isinstance(other,Attacker)):
             if self.b_type == MAP_RIGHT_DOWN:
                 if other.direction == DIRECTION_RIGHT:
                     if other.x>self.x:
@@ -172,6 +186,7 @@ class Barrier(sge.dsp.Object):
                     if other.y<self.y:
                         other.y=self.y
                         other.turn(TURN_RIGHT)
+            #TODO judge whether it is gameover. (check collection of end point)
 
 class Defence(sge.dsp.Object):
 
@@ -249,7 +264,7 @@ class Bullet(sge.dsp.Object):
 
 class Arrow(Bullet):
     speed = 10
-    dmage = 30
+    dmage = 20
     def __init__(self,x,y,obj):
         super(Arrow,self).__init__(obj,x,y,9,sprite=arrow_sprite)
         self.attacted = []
@@ -261,7 +276,7 @@ class Arrow(Bullet):
         self.yvelocity=math.sin(self.angle)*self.speed
 
     def event_collision(self,obj,xdirection,ydirection):
-        if isinstance(obj,Attackter):
+        if isinstance(obj,Attacker):
             if obj not in self.attacted:
                 obj.hurt(self,self.dmage)
                 self.attacted.append(obj)
@@ -270,6 +285,30 @@ class Arrow(Bullet):
         if self.bbox_bottom < 0 or self.bbox_top > sge.game.current_room.height \
             or self.bbox_right < 0 or self.bbox_left > sge.game.current_room.width:
             self.destroy()
+
+class HealthBar(sge.dsp.Object):
+    def __init__(self,to,*args,**kwargs):
+        self.bindObject = to
+        self.max_health = to.max_health
+        kwargs['tangible']=False
+        super(HealthBar,self).__init__(self.bindObject.x,self.bindObject.bbox_top - 20,10,*args,**kwargs)
+
+    def event_step(self,time_passed,delta_mult):
+        self.x = self.bindObject.x
+        self.y = self.bindObject.bbox_top - 10
+
+class AttackerHealthBar(HealthBar):
+    def __init__(self,to):
+        super(AttackerHealthBar,self).__init__(to)
+        self.max_width = 48  # 50 - 2 (border)
+        self.max_height = 6  # 8 - 2
+        self.refresh(self.bindObject.max_health)
+
+    def refresh(self,health):
+        temp_sprite = AttackerHealthBar_sprite.copy()
+        width = int(self.max_width * self.bindObject.health / self.bindObject.max_health // 1)
+        temp_sprite.draw_rectangle(1,1,width,self.max_height,fill=sge.gfx.Color('red'))
+        self.sprite = temp_sprite
 
 class Field(sge.dsp.Object):
     def __init__(self,x,y,f_type):
@@ -296,18 +335,24 @@ def distance(x1,y1,x2,y2):
 
 Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
+# state model
+AttackerDict = {'Badguy':Badguy}
 # load sprites
 badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
 badguy_sprite.rotate(180)
 dude_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
 arrow_sprite  = sge.gfx.Sprite('bullet',DATA,origin_x=21,origin_y=5)
 hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
+AttackerHealthBar_sprite = sge.gfx.Sprite(width=50,height=8,origin_x=25,origin_y=4)
+AttackerHealthBar_sprite.draw_rectangle(0,0,50,8,outline=sge.gfx.Color('black'),fill=sge.gfx.Color('green'))
 
+# load map
 import ZSgame_map
 field_sprites = ZSgame_map.field_sprites
 zmap = ZSgame_map.zmap
+
 # load background
-zmap_info = {'turn':[]}
+zmap_info = {'turn':[],'attacker':ZSgame_map.attacker}
 layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
 ZSgame_map.addLayer(layers,zmap_info)
 background = sge.gfx.Background(layers,sge.gfx.Color((85,170,255)))

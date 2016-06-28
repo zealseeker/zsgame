@@ -11,6 +11,7 @@
 '''
 from ZSgame2_init import *
 zmap =[]
+attacker = []
 for i in range(20):
     zmap.append([0]*20)
 zmap[1][1]=1
@@ -27,6 +28,10 @@ zmap[2][1]=6
 for i in range(2,9):
     zmap[2][i]=3
 zmap[2][9]=2
+for i in range(20):
+    attacker.append('Badguy')
+
+
 
 def addLayer(layer,zmap_info):
     for i in range(20):
@@ -78,7 +83,7 @@ map_sprite=sge.gfx.Sprite(width=50,height=50)
 map_sprite.draw_rectangle(20,0,10,50,fill=sge.gfx.Color('black'))
 map_sprites.append(map_sprite)
 
-# FIELDS
+# FIELDS - used to control the range of the field of avaiable field when deploying.
 
 P_FIELD_UP = [[0,0,MAP_SCALE,0]]
 P_FIELD_DOWN = [[0,MAP_SCALE-1,MAP_SCALE,MAP_SCALE-1]]
