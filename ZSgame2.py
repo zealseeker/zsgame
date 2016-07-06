@@ -48,6 +48,18 @@ class Scene(sge.dsp.Room):
         # Todo load map
         self.attackers = zmap_info['attacker']
         self.attackerPoint = 0
+        self.empty = False
+        self.processing = True
+        self.attacker_alive = len(self.attackers)
+
+    def myevent_attacker_destroy(self,obj):
+        self.attacker_alive -= 1
+        print self.attacker_alive
+
+    def check_win(self):
+        if self.attacker_alive == 0 and self.empty==True:
+            self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('youwin',DATA),0,0,10000))
+            self.processing = False
 
     def event_room_start(self):
         for each in zmap_info['turn']:
@@ -55,7 +67,7 @@ class Scene(sge.dsp.Room):
         self.alarms['add_badguy']=1
 
     def event_key_press(self, key, char):
-        if key == '1':
+        if key == '1' and self.processing:
             Dude.create(sge.game.mouse.x,sge.game.mouse.y)
             create_fields()
 
@@ -66,7 +78,8 @@ class Scene(sge.dsp.Room):
             self.attackerPoint+=1
             if self.attackerPoint == len(self.attackers):
                 # Win
-                self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('youwin',DATA),0,0,10000))
+                self.empty = True
+                #
                 # TODO bug: it is not win when the last attacker emergers, but when the last attacker dies.
             else:
                 self.alarms['add_badguy']=120
@@ -129,6 +142,7 @@ class Attacker(sge.dsp.Object):
             self.yvelocity = -1* self.speed*(self.direction-3)
             self.xvelocity = 0
     def event_destroy(self):
+        sge.game.current_room.myevent_attacker_destroy(self)
         self.healthBar.destroy()
 
 class Badguy(Attacker):
@@ -186,7 +200,8 @@ class Barrier(sge.dsp.Object):
                     if other.y<self.y:
                         other.y=self.y
                         other.turn(TURN_RIGHT)
-            #TODO judge whether it is gameover. (check collection of end point)
+            elif self.b_type == MAP_END:
+                #TODO judge whether it is gameover. (check collection of end point)
 
 class Defence(sge.dsp.Object):
 
