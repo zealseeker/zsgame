@@ -10,8 +10,12 @@
 8 : |
 '''
 from ZSgame2_init import *
+
+# set map information
 zmap =[]
 attacker = []
+
+# set map texture
 for i in range(20):
     zmap.append([0]*20)
 zmap[1][1]=1
@@ -28,6 +32,8 @@ zmap[2][1]=6
 for i in range(2,9):
     zmap[2][i]=3
 zmap[2][9]=2
+
+# define attackers
 for i in range(20):
     attacker.append('Badguy')
 
@@ -39,9 +45,11 @@ def addLayer(layer,zmap_info):
 
             if zmap[i][j]!=0:
                 layer.append(sge.gfx.BackgroundLayer(map_sprites[zmap[i][j]-1],50*j,50*i,-10000))
-            if zmap[i][j]==1:
+            if zmap[i][j]==MAP_START:
                 zmap_info['start']=(i,j,DIRECTION_RIGHT)
-            if zmap[i][j]>3 and zmap[i][j]<8:
+            elif zmap[i][j]==MAP_END:
+                zmap_info['end'] = (i,j)
+            elif zmap[i][j]>3 and zmap[i][j]<8:
                 zmap_info['turn'].append((i,j,zmap[i][j]))
 
 ### Sprites

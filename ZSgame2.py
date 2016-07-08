@@ -9,7 +9,7 @@ game_in_progress = True
 class Game(sge.dsp.Game):
 
     def event_step(self,time_passed,delta_mult):
-        self.project_sprite(hud_sprite,0,self.width-100,0)
+        pass
 
     def event_key_press(self,key,char):
         global game_in_progress
@@ -51,20 +51,35 @@ class Scene(sge.dsp.Room):
         self.empty = False
         self.processing = True
         self.attacker_alive = len(self.attackers)
+        self.gold = 100
 
     def myevent_attacker_destroy(self,obj):
         self.attacker_alive -= 1
-        print self.attacker_alive
+        self.check_win()
 
     def check_win(self):
         if self.attacker_alive == 0 and self.empty==True:
             self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('youwin',DATA),0,0,10000))
-            self.processing = False
+            self.stop_process()
+
+    def lose(self):
+        self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('gameover',DATA),0,0,10000))
+        self.stop_process()
+        #TODO Stop the game (collection event)
+
+    def stop_process(self):
+        self.processing = False
+        for obj in self.objects:
+            obj.tangible = False
+            obj.active   = False
 
     def event_room_start(self):
         for each in zmap_info['turn']:
             Barrier.create(*each)
+        Barrier.create(zmap_info['end'][0],zmap_info['end'][1],MAP_END)
         self.alarms['add_badguy']=1
+        self.controlBar=ControlBar.create(self)
+
 
     def event_key_press(self, key, char):
         if key == '1' and self.processing:
@@ -72,6 +87,8 @@ class Scene(sge.dsp.Room):
             create_fields()
 
     def event_alarm(self,alarm_id):
+        if not self.processing:
+            return False
         if alarm_id == 'add_badguy':
             coord = zmap_info['start']
             AttackerDict[self.attackers[self.attackerPoint]].create(*coord)
@@ -83,6 +100,12 @@ class Scene(sge.dsp.Room):
                 # TODO bug: it is not win when the last attacker emergers, but when the last attacker dies.
             else:
                 self.alarms['add_badguy']=120
+
+    def event_step(self,time_passed,delta_mult):
+        hud_sprite.draw_clear()
+        hud_sprite.draw_text(hud_font,'GOLD: '+str(sge.game.current_room.gold),0,0,color=sge.gfx.Color("white"))
+        hud_sprite.draw_text(hud_font,'REMAIN:' +str(sge.game.current_room.attacker_alive),0,20,color=sge.gfx.Color('white'))
+        self.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
 
 
 class Attacker(sge.dsp.Object):
@@ -97,8 +120,8 @@ class Attacker(sge.dsp.Object):
 
     def hurt(self,obj,dmage):
         self.health -= dmage
-        print 'I am hurted, current health:',self.health
         if self.health <= 0:
+            sge.game.current_room.gold+=self.gold
             self.destroy()
         else:
             self.healthBar.refresh(self.health)
@@ -148,6 +171,7 @@ class Attacker(sge.dsp.Object):
 class Badguy(Attacker):
     health = 100
     speed = 2
+    gold = 0
     def __init__(self,x,y,direction):
         self.max_health = Badguy.health
         self.health = Badguy.health
@@ -201,6 +225,14 @@ class Barrier(sge.dsp.Object):
                         other.y=self.y
                         other.turn(TURN_RIGHT)
             elif self.b_type == MAP_END:
+                judge_dic = {DIRECTION_LEFT: other.x < self.x,
+                 DIRECTION_RIGHT: other.x > self.x,
+                 DIRECTION_UP: other.y > self.y,
+                 DIRECTION_DOWN: other.y < self.y
+                 }
+                if judge_dic[other.direction]:
+                    other.destroy()
+                    sge.game.current_room.lose()
                 #TODO judge whether it is gameover. (check collection of end point)
 
 class Defence(sge.dsp.Object):
@@ -230,16 +262,18 @@ class Defence(sge.dsp.Object):
         # now only consider size 1
         i = int(self.y // MAP_SCALE)
         j = int(self.x // MAP_SCALE)
-        if zmap[i][j]==0:
+        if zmap[i][j]==0 and sge.game.current_room.gold >= self.gold:
             self.image_alpha=255
             self.deployed = True
             self.alarms['kill']= self.attack_freq
             self.x = j * MAP_SCALE + MAP_SCALE/2
             self.y = i * MAP_SCALE + MAP_SCALE/2
+            sge.game.current_room.gold -= self.gold
             # hidden FIELDS
             for obj in sge.game.current_room.objects[:]:
                 if isinstance(obj,Field):
                     obj.destroy()
+
 
 
     def event_mouse_move(self,x,y):
@@ -252,6 +286,10 @@ class Defence(sge.dsp.Object):
                 self.deploy()
             elif button == 'right':
                 self.destroy()
+                # destroy Fields
+                for obj in sge.game.current_room.objects[:]:
+                    if isinstance(obj,Field):
+                        obj.destroy()
 
     def event_alarm(self,alarm_id):
         if alarm_id == 'kill':
@@ -259,8 +297,9 @@ class Defence(sge.dsp.Object):
             self.alarms['kill']= self.attack_freq
 
 class Dude(Defence):
-    attack_freq = 60
+    attack_freq = 70
     attack_rage = 40
+    gold = 50
     def __init__(self,x,y):
         super(Dude,self).__init__(x,y,sprite=dude_sprite,checks_collisions=False)
     def kill(self,obj):
@@ -330,6 +369,25 @@ class Field(sge.dsp.Object):
         super(Field,self).__init__(x,y,10,sprite=field_sprites[f_type],
         checks_collisions=False,tangible=False)
 
+
+class ControlBar(sge.dsp.Object):
+    def __init__(self,room):
+        y = sge.game.height - controlBar_sprite.height
+        super(ControlBar,self).__init__(0,y,50,sprite=controlBar_sprite)
+
+
+class Skill(sge.dsp.Object):
+    skill_width = 50
+    def __init__(self,skillid,left,height,*args,**kwargs):
+        x = left + skill_width * (skillid-1)
+        y = height
+        super(Skill,self).__init__(x,y,60,*args,**kwargs)
+
+    def event_key_press(self,key, char):
+        #TODO put the key_press function of room here
+        pass
+
+
 def create_fields():
     for i,row in enumerate(zmap):
         for j,col in enumerate(row):
@@ -348,18 +406,23 @@ def create_fields():
 def distance(x1,y1,x2,y2):
     return math.sqrt((x1-x2)**2+(y1-y2)**2)
 
-Game(width=640,height=480,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
+Game(width=WINDOW_WIDTH,height=WINDOW_HEIGHT,scale=1,fps=60,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # state model
 AttackerDict = {'Badguy':Badguy}
 # load sprites
+controlBar_sprite = sge.gfx.Sprite(width=WINDOW_WIDTH,height=100)
+controlBar_sprite.draw_rectangle(0,0,controlBar_sprite.width,controlBar_sprite.height,fill=sge.gfx.Color('green'))
 badguy_sprite = sge.gfx.Sprite('badguy',DATA,fps=10,origin_x=32,origin_y=15)
 badguy_sprite.rotate(180)
 dude_sprite   = sge.gfx.Sprite('dude',DATA,origin_x=32,origin_y=23)
 arrow_sprite  = sge.gfx.Sprite('bullet',DATA,origin_x=21,origin_y=5)
-hud_sprite    = sge.gfx.Sprite(width=320, height=120, origin_x=160, origin_y=0)
 AttackerHealthBar_sprite = sge.gfx.Sprite(width=50,height=8,origin_x=25,origin_y=4)
+red_border_sprite = sge.gfx.Sprite('red_border',DATA,origin_x=25,origin_y=25)
 AttackerHealthBar_sprite.draw_rectangle(0,0,50,8,outline=sge.gfx.Color('black'),fill=sge.gfx.Color('green'))
+hud_sprite  = sge.gfx.Sprite(width=100, height=80)
+#load font
+hud_font = sge.gfx.Font("Arial", size=18)
 
 # load map
 import ZSgame_map
@@ -370,7 +433,7 @@ zmap = ZSgame_map.zmap
 zmap_info = {'turn':[],'attacker':ZSgame_map.attacker}
 layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
 ZSgame_map.addLayer(layers,zmap_info)
-background = sge.gfx.Background(layers,sge.gfx.Color((85,170,255)))
+background = sge.gfx.Background(layers,sge.gfx.Color((85,170,0)))
 sge.game.start_room = Scene()
 
 if __name__ == '__main__':
