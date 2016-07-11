@@ -41,7 +41,7 @@ for i in range(10):
 
 
 def addLayer(layer,zmap_info):
-     for i in range(20):
+    for i in range(20):
         for j in range(20):
 
             if zmap[i][j]!=0:
