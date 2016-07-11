@@ -45,13 +45,13 @@ class Game(sge.dsp.Game):
 class Scene(sge.dsp.Room):
     def __init__(self,difficulty=0):
         super(Scene,self).__init__(background=background)
-        # Todo load map
         self.attackers = zmap_info['attacker']
         self.attackerPoint = 0
         self.empty = False
         self.processing = True
         self.attacker_alive = len(self.attackers)
         self.gold = 100
+        self.deploying = None  # Whether some defence is deploying (fields will show)
 
     def myevent_attacker_destroy(self,obj):
         self.attacker_alive -= 1
@@ -82,16 +82,28 @@ class Scene(sge.dsp.Room):
 
 
     def event_key_press(self, key, char):
+        print self.deploying, self.deploying.deployed if self.deploying else None
+        if key in '123456':
+
+            if self.deploying:
+                self.deploying.destroy()
+                self.deploying = None
+            else:
+                create_fields()
         if key == '1' and self.processing:
-            Dude.create(sge.game.mouse.x,sge.game.mouse.y)
-            create_fields()
+            self.deploying = Dude.create(sge.game.mouse.x,sge.game.mouse.y)
+
 
     def event_alarm(self,alarm_id):
         if not self.processing:
             return False
         if alarm_id == 'add_badguy':
             coord = zmap_info['start']
-            AttackerDict[self.attackers[self.attackerPoint]].create(*coord)
+            kwargs = self.attackers[self.attackerPoint]
+            modelname = self.attackers[self.attackerPoint]['model']
+            del kwargs['model']
+            print self.attackers[self.attackerPoint]
+            AttackerDict[modelname].create(*coord,**kwargs)
             self.attackerPoint+=1
             if self.attackerPoint == len(self.attackers):
                 # Win
@@ -111,10 +123,17 @@ class Scene(sge.dsp.Room):
 class Attacker(sge.dsp.Object):
 
     def __init__(self,x,y,direction,**kwargs):
+        if 'health' in kwargs:
+            self.max_health = kwargs['health']
+            del kwargs['health']
+        if 'speed'  in kwargs:
+            self.speed = kwargs['speed']
+            del kwargs['speed']
         i=x;j=y
         x=j*MAP_SCALE+MAP_SCALE/2
         y=i*MAP_SCALE+MAP_SCALE/2
         self.direction = direction
+        self.health = self.max_health
         super(Attacker,self).__init__(x,y,**kwargs)
         self.healthBar = AttackerHealthBar.create(self)
 
@@ -172,11 +191,10 @@ class Badguy(Attacker):
     health = 100
     speed = 2
     gold = 0
-    def __init__(self,x,y,direction):
-        self.max_health = Badguy.health
-        self.health = Badguy.health
+    def __init__(self,x,y,direction,**kwargs):
+        self.max_health = self.health
         super(Badguy,self).__init__(x,y,direction,sprite=badguy_sprite,
-        checks_collisions=False)
+        checks_collisions=False,**kwargs)
 
 class Barrier(sge.dsp.Object):
     def __init__(self,x,y,b_type):
@@ -270,6 +288,7 @@ class Defence(sge.dsp.Object):
             self.y = i * MAP_SCALE + MAP_SCALE/2
             sge.game.current_room.gold -= self.gold
             # hidden FIELDS
+            sge.game.current_room.deploying = None
             for obj in sge.game.current_room.objects[:]:
                 if isinstance(obj,Field):
                     obj.destroy()
@@ -278,14 +297,17 @@ class Defence(sge.dsp.Object):
 
     def event_mouse_move(self,x,y):
         if not self.deployed :
-            self.x = sge.game.mouse.x // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
-            self.y = sge.game.mouse.y // MAP_SCALE * MAP_SCALE + MAP_SCALE/2
+            map_x = sge.game.mouse.x // MAP_SCALE
+            map_y = sge.game.mouse.y // MAP_SCALE
+            self.x = (map_x if map_x < MAP_WIDTH else MAP_WIDTH-1) * MAP_SCALE + MAP_SCALE/2
+            self.y = (map_y if map_y < MAP_HEIGHT else MAP_HEIGHT-1) * MAP_SCALE + MAP_SCALE/2
     def event_mouse_button_press(self,button):
         if not self.deployed :
             if button == 'left':
                 self.deploy()
             elif button == 'right':
                 self.destroy()
+                sge.game.current_room.deploying = None
                 # destroy Fields
                 for obj in sge.game.current_room.objects[:]:
                     if isinstance(obj,Field):
@@ -297,7 +319,7 @@ class Defence(sge.dsp.Object):
             self.alarms['kill']= self.attack_freq
 
 class Dude(Defence):
-    attack_freq = 70
+    attack_freq = 60
     attack_rage = 40
     gold = 50
     def __init__(self,x,y):

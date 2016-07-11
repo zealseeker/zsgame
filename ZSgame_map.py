@@ -34,13 +34,14 @@ for i in range(2,9):
 zmap[2][9]=2
 
 # define attackers
-for i in range(20):
-    attacker.append('Badguy')
-
+for i in range(10):
+    attacker.append({'model':'Badguy','health':100,'speed':1.5})
+for i in range(10):
+    attacker.append({'model':'Badguy','health':110,'speed':2})
 
 
 def addLayer(layer,zmap_info):
-    for i in range(20):
+     for i in range(20):
         for j in range(20):
 
             if zmap[i][j]!=0:
