@@ -43,9 +43,16 @@ class Game(sge.dsp.Game):
         self.event_close()
 
 class Scene(sge.dsp.Room):
-    def __init__(self,difficulty=0):
+    def __init__(self,custom_id=1):
+        customs_pass = ZSgame_map.customs_pass[custom_id]
+        self.zmap_info = {'turn':[],'attacker':customs_pass['attackers'],'zmap':customs_pass['zmap']}
+        layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
+        if not ZSgame_map.addLayer(layers,self.zmap_info):
+            print 'map error'
+            sge.game.end()
+        background = sge.gfx.Background(layers,sge.gfx.Color((85,170,0)))
         super(Scene,self).__init__(background=background)
-        self.attackers = zmap_info['attacker']
+        self.attackers = self.zmap_info['attacker']
         self.attackerPoint = 0
         self.empty = False
         self.processing = True
@@ -74,9 +81,9 @@ class Scene(sge.dsp.Room):
             obj.active   = False
 
     def event_room_start(self):
-        for each in zmap_info['turn']:
+        for each in self.zmap_info['turn']:
             Barrier.create(*each)
-        Barrier.create(zmap_info['end'][0],zmap_info['end'][1],MAP_END)
+        Barrier.create(self.zmap_info['end'][0],self.zmap_info['end'][1],MAP_END)
         self.alarms['add_badguy']=1
         self.controlBar=ControlBar.create(self)
 
@@ -89,7 +96,7 @@ class Scene(sge.dsp.Room):
                 self.deploying.destroy()
                 self.deploying = None
             else:
-                create_fields()
+                create_fields(self.zmap_info['zmap'])
         if key == '1' and self.processing:
             self.deploying = Dude.create(sge.game.mouse.x,sge.game.mouse.y)
 
@@ -98,7 +105,7 @@ class Scene(sge.dsp.Room):
         if not self.processing:
             return False
         if alarm_id == 'add_badguy':
-            coord = zmap_info['start']
+            coord = self.zmap_info['start']
             kwargs = self.attackers[self.attackerPoint]
             modelname = self.attackers[self.attackerPoint]['model']
             del kwargs['model']
@@ -106,10 +113,7 @@ class Scene(sge.dsp.Room):
             AttackerDict[modelname].create(*coord,**kwargs)
             self.attackerPoint+=1
             if self.attackerPoint == len(self.attackers):
-                # Win
                 self.empty = True
-                #
-                # TODO bug: it is not win when the last attacker emergers, but when the last attacker dies.
             else:
                 self.alarms['add_badguy']=120
 
@@ -129,6 +133,9 @@ class Attacker(sge.dsp.Object):
         if 'speed'  in kwargs:
             self.speed = kwargs['speed']
             del kwargs['speed']
+        if 'gold' in kwargs:
+            self.gold = kwargs['gold']
+            del kwargs['gold']
         i=x;j=y
         x=j*MAP_SCALE+MAP_SCALE/2
         y=i*MAP_SCALE+MAP_SCALE/2
@@ -169,7 +176,6 @@ class Attacker(sge.dsp.Object):
         self.speed = speed
         self.turn(0)
 
-
     def event_alarm(self,alarm_id):
         if alarm_id == 'rotate':
             self.image_rotation+=10*self.turning_direction
@@ -195,6 +201,7 @@ class Badguy(Attacker):
         self.max_health = self.health
         super(Badguy,self).__init__(x,y,direction,sprite=badguy_sprite,
         checks_collisions=False,**kwargs)
+        self.image_rotation += 90*(self.direction-1)
 
 class Barrier(sge.dsp.Object):
     def __init__(self,x,y,b_type):
@@ -261,34 +268,37 @@ class Defence(sge.dsp.Object):
 
     def __init__(self,*args,**kwarges):
         kwarges['image_alpha']=50
+        self.show_range = True
+        self.searching_enemy = False
         super(Defence,self).__init__(*args,**kwarges)
 
     def kill(self,obj):
-
+        self.killing_obj = obj
         return True
 
     def search_enemy(self):
         for obj in sge.game.current_room.objects[:]:
             if isinstance(obj,Badguy):
                 if distance(self.x,self.y,obj.x,obj.y) < self.attack_range:
-
                     self.kill(obj)
                     return True
         return False
 
     def deploy(self):
         # now only consider size 1
+        zmap = sge.game.current_room.zmap_info['zmap']
         i = int(self.y // MAP_SCALE)
         j = int(self.x // MAP_SCALE)
         if zmap[i][j]==0 and sge.game.current_room.gold >= self.gold:
             self.image_alpha=255
             self.deployed = True
-            self.alarms['kill']= self.attack_freq
+            self.searching_enemy = True
             self.x = j * MAP_SCALE + MAP_SCALE/2
             self.y = i * MAP_SCALE + MAP_SCALE/2
             sge.game.current_room.gold -= self.gold
             # hidden FIELDS
             sge.game.current_room.deploying = None
+            self.show_range=False
             for obj in sge.game.current_room.objects[:]:
                 if isinstance(obj,Field):
                     obj.destroy()
@@ -315,8 +325,16 @@ class Defence(sge.dsp.Object):
 
     def event_alarm(self,alarm_id):
         if alarm_id == 'kill':
-            self.search_enemy()
-            self.alarms['kill']= self.attack_freq
+            self.searching_enemy = True
+
+
+    def event_step(self, time_passed, delta_mult):
+        if self.show_range:
+            sge.game.current_room.project_circle(self.x,self.y,50,self.attack_range,fill=RANGE_COLOR,outline=RANGE_OUTLINE_COLOR)
+        if self.searching_enemy:
+            if self.search_enemy():
+                self.searching_enemy = False
+                self.alarms['kill']= self.attack_freq
 
 class Dude(Defence):
     attack_freq = 60
@@ -410,7 +428,7 @@ class Skill(sge.dsp.Object):
         pass
 
 
-def create_fields():
+def create_fields(zmap):
     for i,row in enumerate(zmap):
         for j,col in enumerate(row):
             if col != 0:
@@ -449,13 +467,10 @@ hud_font = sge.gfx.Font("Arial", size=18)
 # load map
 import ZSgame_map
 field_sprites = ZSgame_map.field_sprites
-zmap = ZSgame_map.zmap
 
 # load background
-zmap_info = {'turn':[],'attacker':ZSgame_map.attacker}
-layers = [sge.gfx.BackgroundLayer(sge.gfx.Sprite('grass',DATA,transparent=False),0,0,-10000,repeat_down=True,repeat_right=True)]
-ZSgame_map.addLayer(layers,zmap_info)
-background = sge.gfx.Background(layers,sge.gfx.Color((85,170,0)))
+
+
 sge.game.start_room = Scene()
 
 if __name__ == '__main__':

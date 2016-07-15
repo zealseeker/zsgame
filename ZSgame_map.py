@@ -1,19 +1,22 @@
 # -*- coding:utf-8 -*-
 '''
-1 :  start
-2 ： end
-3 :  -
-4 :  ┐
-5 :  ┘
-6 : ┌
-7 : └
-8 : |
+Constants of the tags in map:
+1 :  start point
+2 ： end point
+3 :  -   HORIZONTAL
+4 :  ┐   Right_DOWN
+5 :  ┘   RIGHT_UP
+6 : ┌    LEFT_DOWN
+7 : └    LEFT_UP
+8 : |    VERTICAL
 '''
 from ZSgame2_init import *
 
-# set map information
+# set customs_pass information
+customs_pass = []
+# For each customs pass, use two Lists to define the map which are:
 zmap =[]
-attacker = []
+attackers = []
 
 # set map texture
 for i in range(20):
@@ -35,23 +38,62 @@ zmap[2][9]=2
 
 # define attackers
 for i in range(10):
-    attacker.append({'model':'Badguy','health':100,'speed':1.5})
+    attackers.append({'model':'Badguy','health':100,'speed':1.5,'gold':8})
 for i in range(10):
-    attacker.append({'model':'Badguy','health':110,'speed':2})
+    attackers.append({'model':'Badguy','health':110,'speed':2,'gold':2})
+
+customs_pass.append({'zmap':zmap,'attackers':attackers})
+
+# the second custom:
+zmap=[]
+attackers = []
+maps = '''
+0    0    0    0    0    0    0    0    0    0    0    0
+0    6    3    4    0    0    0    6    3    3    4    0
+0    8    0    8    0    0    0    8    0    0    8    0
+0    8    0    8    0    0    0    8    0    0    8    0
+0    8    0    8    0    0    0    8    0    0    8    0
+0    8    0    8    0    0    0    8    0    0    8    0
+0    1    0    7    3    3    3    5    0    0    2    0
+0    0    0    0    0    0    0    0    0    0    0    0
+'''.strip().split('\n')
+zmap = [[int(x)for x in line.split('   ')]for line in maps]
+for i in range(10):
+    attackers.append({'model':'Badguy','health':100,'speed':1.5,'gold':8})
+for i in range(10):
+    attackers.append({'model':'Badguy','health':150,'speed':2,'gold':2})
+
+customs_pass.append({'zmap':zmap,'attackers':attackers})
 
 
 def addLayer(layer,zmap_info):
-    for i in range(20):
-        for j in range(20):
+    zmap = zmap_info['zmap']
+    print zmap_info
+
+    for i in range(MAP_HEIGHT):
+        for j in range(MAP_WIDTH):
 
             if zmap[i][j]!=0:
                 layer.append(sge.gfx.BackgroundLayer(map_sprites[zmap[i][j]-1],50*j,50*i,-10000))
             if zmap[i][j]==MAP_START:
-                zmap_info['start']=(i,j,DIRECTION_RIGHT)
+                # ensure the direction
+                direction = 0
+                if i!=0 and zmap[i-1][j]!=0:
+                    direction = DIRECTION_UP
+                elif i!=MAP_HEIGHT-1 and zmap[i+1][j]!=0:
+                    direction = DIRECTION_DOWN
+                elif j!=0 and zmap[i][j-1]!=0:
+                    direction = DIRECTION_LEFT
+                elif j!=MAP_WIDTH-1 and zmap[i][j+1]!=0:
+                    direction = DIRECTION_RIGHT
+                else:
+                    return False
+                zmap_info['start']=(i,j,direction)
             elif zmap[i][j]==MAP_END:
                 zmap_info['end'] = (i,j)
             elif zmap[i][j]>3 and zmap[i][j]<8:
                 zmap_info['turn'].append((i,j,zmap[i][j]))
+    return True
 
 ### Sprites
 map_sprites=[]

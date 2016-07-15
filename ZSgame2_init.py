@@ -42,4 +42,7 @@ FIELD_R_RIGHT = 7
 FIELD_ALL = 15
 FIELD_R_ALL = 0
 FIELD_OUTLINE_COLOR = sge.gfx.Color('red')
+
 FIELD_COLOR = sge.gfx.Color([255,0,0,50])
+RANGE_COLOR = sge.gfx.Color([0,0,0,50])
+RANGE_OUTLINE_COLOR = sge.gfx.Color([0,0,0])
