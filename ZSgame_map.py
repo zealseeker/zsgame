@@ -42,6 +42,9 @@ for i in range(10):
 for i in range(10):
     attackers.append({'model':'Badguy','health':110,'speed':2,'gold':2})
 
+
+#attackers = [{'model':'Badguy','health':1,'speed':5}]    # This is for test
+
 customs_pass.append({'zmap':zmap,'attackers':attackers})
 
 # the second custom:
@@ -78,16 +81,17 @@ def addLayer(layer,zmap_info):
             if zmap[i][j]==MAP_START:
                 # ensure the direction
                 direction = 0
-                if i!=0 and zmap[i-1][j]!=0:
+                if i!=0 and zmap[i-1][j]==MAP_VERTICLE:
                     direction = DIRECTION_UP
-                elif i!=MAP_HEIGHT-1 and zmap[i+1][j]!=0:
+                elif i!=MAP_HEIGHT-1 and zmap[i+1][j]==MAP_VERTICLE:
                     direction = DIRECTION_DOWN
-                elif j!=0 and zmap[i][j-1]!=0:
+                elif j!=0 and zmap[i][j-1]==MAP_HORIZON:
                     direction = DIRECTION_LEFT
-                elif j!=MAP_WIDTH-1 and zmap[i][j+1]!=0:
+                elif j!=MAP_WIDTH-1 and zmap[i][j+1]==MAP_HORIZON:
                     direction = DIRECTION_RIGHT
                 else:
                     return False
+                print direction
                 zmap_info['start']=(i,j,direction)
             elif zmap[i][j]==MAP_END:
                 zmap_info['end'] = (i,j)
