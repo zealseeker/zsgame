@@ -43,7 +43,7 @@ for i in range(10):
     attackers.append({'model':'Badguy','health':110,'speed':2,'gold':2})
 
 
-#attackers = [{'model':'Badguy','health':1,'speed':5}]    # This is for test
+attackers = [{'model':'Badguy','health':1,'speed':5}]    # This is for test
 
 customs_pass.append({'zmap':zmap,'attackers':attackers})
 
@@ -71,7 +71,6 @@ customs_pass.append({'zmap':zmap,'attackers':attackers})
 
 def addLayer(layer,zmap_info):
     zmap = zmap_info['zmap']
-    print zmap_info
 
     for i in range(MAP_HEIGHT):
         for j in range(MAP_WIDTH):
@@ -91,7 +90,6 @@ def addLayer(layer,zmap_info):
                     direction = DIRECTION_RIGHT
                 else:
                     return False
-                print direction
                 zmap_info['start']=(i,j,direction)
             elif zmap[i][j]==MAP_END:
                 zmap_info['end'] = (i,j)

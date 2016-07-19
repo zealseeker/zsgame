@@ -3,7 +3,13 @@ from ZSgame_init import *
 import os,pygame,math
 
 __version__ = "0.1"
-DATA = os.path.join(os.path.abspath(os.path.dirname(__file__)),"resources","images")
+
+try:
+    DATA = os.path.join(os.path.abspath(os.path.dirname(__file__)),"resources","images")
+except NameError:
+    import sys
+    # to be complatible for py2exe
+    DATA = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])),"resources","images")
 game_in_progress = True
 
 class Game(sge.dsp.Game):
@@ -19,7 +25,7 @@ class Game(sge.dsp.Game):
             self.fullscreen = not self.fullscreen
         elif key == 'escape':
             self.event_close()
-        elif key in ('p', 'enter'):
+        elif key == 'p':
             if game_in_progress:
                 self.pause()
             else:
@@ -60,13 +66,14 @@ class Scene(sge.dsp.Room):
         self.gold = 100
         self.deploying = None  # Whether some defence is deploying (fields will show)
         self.countDown = -1
+        self.Islost = False
 
     def myevent_attacker_destroy(self,obj):
         self.attacker_alive -= 1
         self.check_win()
 
     def check_win(self):
-        if self.attacker_alive == 0 and self.empty==True:
+        if self.attacker_alive == 0 and self.empty==True and self.processing:
             self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('youwin',DATA),0,0,10000))
             self.stop_process()
             self.countDown = 5
@@ -76,7 +83,7 @@ class Scene(sge.dsp.Room):
     def lose(self):
         self.background.layers.append(sge.gfx.BackgroundLayer(sge.gfx.Sprite('gameover',DATA),0,0,10000))
         self.stop_process()
-        #TODO Give entrance to start again
+        self.Islost=True
 
     def stop_process(self):
         self.processing = False
@@ -93,16 +100,9 @@ class Scene(sge.dsp.Room):
 
 
     def event_key_press(self, key, char):
-        if key in '123456':
-
-            if self.deploying:
-                self.deploying.destroy()
-                self.deploying = None
-            else:
-                create_fields(self.zmap_info['zmap'])
-        if key == '1' and self.processing:
-            self.deploying = Dude.create(sge.game.mouse.x,sge.game.mouse.y)
-
+        if key=='enter' and self.Islost:
+            Scene().start()
+        pass
 
     def event_alarm(self,alarm_id):
         if alarm_id == 'next_custom':
@@ -117,7 +117,6 @@ class Scene(sge.dsp.Room):
             coord = self.zmap_info['start']
             kwargs = self.attackers[self.attackerPoint]
             modelname = self.attackers[self.attackerPoint]['model']
-            del kwargs['model']
             AttackerDict[modelname].create(*coord,**kwargs)
             self.attackerPoint+=1
             if self.attackerPoint == len(self.attackers):
@@ -134,11 +133,14 @@ class Scene(sge.dsp.Room):
         self.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
         if self.countDown >0:
             self.project_text(hud_font,str(self.countDown),WINDOW_WIDTH/2-10,WINDOW_HEIGHT/2-10,100,width=20,height=20)
+        elif self.Islost:
+            self.project_text(hud_font,'Input Enter to start again!',WINDOW_WIDTH/2-100,WINDOW_HEIGHT/2-10,100,width=200,height=20)
 
 
 class Attacker(sge.dsp.Object):
 
     def __init__(self,x,y,direction,**kwargs):
+        del kwargs['model']
         if 'health' in kwargs:
             self.max_health = kwargs['health']
             del kwargs['health']
@@ -269,14 +271,16 @@ class Barrier(sge.dsp.Object):
                  DIRECTION_DOWN: other.y < self.y
                  }
                 if judge_dic[other.direction]:
-                    other.destroy()
                     sge.game.current_room.lose()
+                    other.destroy()
+
 
 class Defence(sge.dsp.Object):
 
     deployed=False
     attack_freq = 60
     attack_range = 150
+    defence_dict = {}
 
     def __init__(self,*args,**kwarges):
         kwarges['image_alpha']=50
@@ -355,6 +359,8 @@ class Dude(Defence):
     name = 'dude'
     def __init__(self,x,y):
         super(Dude,self).__init__(x,y,sprite=dude_sprite,checks_collisions=False)
+        super(Dude,self).defence_dict['dude']=Dude
+
     def kill(self,obj):
         Arrow.create(self.x,self.y,obj)
 
@@ -427,21 +433,45 @@ class ControlBar(sge.dsp.Object):
     def __init__(self,room):
         y = sge.game.height -controlBar_sprite.height
         super(ControlBar,self).__init__(0,y,50,sprite=controlBar_sprite)
-        Skill.create(0,50,y,Dude)
+        Skill.create(1,50,y,Dude)
 
 
 class Skill(sge.dsp.Object):
     skill_width = 50
-    def __init__(self,skillid,left,height,Defencer,*args,**kwargs):
+    def __init__(self,skillid,left,height,origin,*args,**kwargs):
+        '@param origin: the origin model(Defence or Magic)'
         x = left + self.skill_width * (skillid)
         y = height + 20
-        super(Skill,self).__init__(x,y,60,*args,sprite=skill_sprites[Defencer.name],**kwargs)
-        self.sprite.draw_text(hud_font,str(skillid+1),self.skill_width-10,self.skill_width-20)
+        self.Origin = origin
+        self.skillid = skillid
+        self.selected = False
+        super(Skill,self).__init__(x,y,60,*args,sprite=skill_sprites[origin.name],**kwargs)
+        self.sprite.draw_text(hud_font,str(skillid),self.skill_width-10,self.skill_width-20)
 
     def event_key_press(self,key, char):
-        #TODO put the key_press function of room here
+        if key in '123456':
+            if sge.game.current_room.deploying:
+                sge.game.current_room.deploying.destroy()
+                sge.game.current_room.deploying = None
+            else:
+                create_fields(sge.game.current_room.zmap_info['zmap'])
+        if key == str(self.skillid) and sge.game.current_room.processing:
+            sge.game.current_room.deploying = self.Origin.create(sge.game.mouse.x,sge.game.mouse.y)
         pass
+    def event_mouse_move(self,x,y):
+        x=sge.game.mouse.x
+        y=sge.game.mouse.y
+        if x > self.bbox_left and x < self.bbox_right and y > self.bbox_top and y < self.bbox_bottom:
+            self.selected = True
+        else:
+            self.selected = False
+    def event_mouse_button_press(self,button):
+        if self.selected and button=='left':
+            self.event_key_press(str(self.skillid),str(self.skillid))
 
+    def event_step(self,time_passed, delta_mult):
+        if self.selected:
+            sge.game.current_room.project_sprite(selected_skill_sprite,0,self.x,self.y,100)
 
 def create_fields(zmap):
     for i,row in enumerate(zmap):
@@ -479,6 +509,7 @@ red_border_sprite = sge.gfx.Sprite('red_border',DATA,origin_x=25,origin_y=25)
 AttackerHealthBar_sprite.draw_rectangle(0,0,50,8,outline=sge.gfx.Color('black'),fill=sge.gfx.Color('green'))
 hud_sprite  = sge.gfx.Sprite(width=100, height=80)
 skill_sprites = {'dude':dude_skill_sprite}
+selected_skill_sprite = sge.gfx.Sprite('selected',DATA,width=50,height=50)
 #load font
 hud_font = sge.gfx.Font("Arial", size=18)
 

@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "zsgame.py", line 477, in <module>
+  File "sge\gfx.pyo", line 469, in __init__
+WindowsError: [Error 3] : 'E:\\ProgramData\\Git\\zsgame\\dist\\resources\\images/*.*'
+Traceback (most recent call last):
+  File "zsgame.py", line 502, in <module>
+  File "sge\dsp.pyo", line 442, in start
+  File "zsgame.py", line 30, in event_key_press
+  File "sge\dsp.pyo", line 663, in pause
+  File "sge\gfx.pyo", line 469, in __init__
+WindowsError: [Error 3] : 'E:\\ProgramData\\Git\\zsgame\\dist\\zsgame.exe\\sge/*.*'
