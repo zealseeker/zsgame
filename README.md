@@ -25,5 +25,5 @@ http://stellarengine.nongnu.org/
 The resources are from [Julian Meyer's program](http://www.raywenderlich.com/24252/beginning-game-programming-for-teens-with-python)
 
 ## Features to do
-Add sound effects
+
 Add upgrading system

@@ -97,6 +97,7 @@ class Scene(sge.dsp.Room):
         Barrier.create(self.zmap_info['end'][0],self.zmap_info['end'][1],MAP_END)
         self.alarms['add_badguy']=1
         self.controlBar=ControlBar.create(self)
+        music_bg.play()
 
 
     def event_key_press(self, key, char):
@@ -163,7 +164,7 @@ class Attacker(sge.dsp.Object):
         if self.health <= 0:
             sge.game.current_room.gold+=self.gold
             self.destroy()
-            # TODO effects of getting golds
+            Float_gold.create(self.x,self.y,self.gold)
         else:
             self.healthBar.refresh(self.health)
         return True
@@ -301,17 +302,20 @@ class Defence(sge.dsp.Object):
         return False
 
     def deploy(self):
-        # now only consider size 1
+        'now only consider size 1'
+        #check avaiability of deploying
         zmap = sge.game.current_room.zmap_info['zmap']
         i = int(self.y // MAP_SCALE)
         j = int(self.x // MAP_SCALE)
         if zmap[i][j]==0 and sge.game.current_room.gold >= self.gold:
+            #deploying
             self.image_alpha=255
             self.deployed = True
             self.searching_enemy = True
             self.x = j * MAP_SCALE + MAP_SCALE/2
             self.y = i * MAP_SCALE + MAP_SCALE/2
             sge.game.current_room.gold -= self.gold
+            snd_dead.play()
             # hidden FIELDS
             sge.game.current_room.deploying = None
             self.show_range=False
@@ -363,6 +367,7 @@ class Dude(Defence):
 
     def kill(self,obj):
         Arrow.create(self.x,self.y,obj)
+        snd_shoot.play()
 
 class Bullet(sge.dsp.Object):
     def __init__(self,obj,x,y,z=0,**kwargs):
@@ -473,6 +478,32 @@ class Skill(sge.dsp.Object):
         if self.selected:
             sge.game.current_room.project_sprite(selected_skill_sprite,0,self.x,self.y,100)
 
+class Float_obj(sge.dsp.Object):
+
+    def __init__(self,x,y,sprite):
+        super(Float_obj,self).__init__(x,y,50,sprite=sprite,checks_collisions=False,tangible=False)
+
+class Float_gold(Float_obj):
+    'upward float of gold'
+    def __init__(self,x,y,gold_value):
+        sprite = sge.gfx.Sprite(width=80,height=20)
+        sprite.draw_sprite(gold_sprite,0,0,0)
+        sprite.draw_text(hud_font,str(gold_value),20,0)
+        super(Float_gold,self).__init__(x,y,sprite)
+        self.yvelocity = -1
+        self.frame = 0
+
+    def event_step(self,time_passed,delta_mult):
+
+        if self.image_alpha <=10:
+            self.destroy()
+        elif self.frame>30:
+            self.image_alpha -=10
+        else:
+            self.frame +=1
+
+
+
 def create_fields(zmap):
     for i,row in enumerate(zmap):
         for j,col in enumerate(row):
@@ -487,6 +518,7 @@ def create_fields(zmap):
                 if j==MAP_WIDTH-1 or zmap[i][j+1]==0:
                     bit+=8
                 Field.create(MAP_SCALE*j,MAP_SCALE*i,bit)
+
 
 def distance(x1,y1,x2,y2):
     return math.sqrt((x1-x2)**2+(y1-y2)**2)
@@ -510,6 +542,7 @@ AttackerHealthBar_sprite.draw_rectangle(0,0,50,8,outline=sge.gfx.Color('black'),
 hud_sprite  = sge.gfx.Sprite(width=100, height=80)
 skill_sprites = {'dude':dude_skill_sprite}
 selected_skill_sprite = sge.gfx.Sprite('selected',DATA,width=50,height=50)
+gold_sprite = sge.gfx.Sprite('gold',DATA,width=20,height=20)
 #load font
 hud_font = sge.gfx.Font("Arial", size=18)
 
@@ -517,7 +550,11 @@ hud_font = sge.gfx.Font("Arial", size=18)
 import ZSgame_map
 field_sprites = ZSgame_map.field_sprites
 
-# load background
+# load sound
+sound_root = os.path.join('resources','audio')
+snd_shoot = sge.snd.Sound(os.path.join(sound_root,'shoot.wav'))
+snd_dead  = sge.snd.Sound(os.path.join(sound_root,'explode.wav'))
+music_bg  = sge.snd.Music(os.path.join(sound_root,'moonlight.wav'))
 
 
 sge.game.start_room = Scene()

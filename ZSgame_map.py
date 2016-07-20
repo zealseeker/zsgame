@@ -40,10 +40,10 @@ zmap[2][9]=2
 for i in range(10):
     attackers.append({'model':'Badguy','health':100,'speed':1.5,'gold':8})
 for i in range(10):
-    attackers.append({'model':'Badguy','health':110,'speed':2,'gold':2})
+    attackers.append({'model':'Badguy','health':110,'speed':3,'gold':2})
 
 
-attackers = [{'model':'Badguy','health':1,'speed':5}]    # This is for test
+#attackers = [{'model':'Badguy','health':1,'speed':5}]    # This is for test
 
 customs_pass.append({'zmap':zmap,'attackers':attackers})
 
