@@ -2,6 +2,7 @@
 from ZSgame_init import *
 import os,pygame,math
 
+from player import *
 __version__ = "0.1"
 
 try:
@@ -63,7 +64,6 @@ class Scene(sge.dsp.Room):
         self.empty = False
         self.processing = True
         self.attacker_alive = len(self.attackers)
-        self.gold = 100
         self.deploying = None  # Whether some defence is deploying (fields will show)
         self.countDown = -1
         self.Islost = False
@@ -95,6 +95,7 @@ class Scene(sge.dsp.Room):
         for each in self.zmap_info['turn']:
             Barrier.create(*each)
         Barrier.create(self.zmap_info['end'][0],self.zmap_info['end'][1],MAP_END)
+        self.player = Player()
         self.alarms['add_badguy']=1
         self.controlBar=ControlBar.create(self)
         music_bg.play()
@@ -128,10 +129,7 @@ class Scene(sge.dsp.Room):
 
 
     def event_step(self,time_passed,delta_mult):
-        hud_sprite.draw_clear()
-        hud_sprite.draw_text(hud_font,'GOLD: '+str(sge.game.current_room.gold),0,0,color=sge.gfx.Color("white"))
-        hud_sprite.draw_text(hud_font,'REMAIN:' +str(sge.game.current_room.attacker_alive),0,20,color=sge.gfx.Color('white'))
-        self.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
+
         if self.countDown >0:
             self.project_text(hud_font,str(self.countDown),WINDOW_WIDTH/2-10,WINDOW_HEIGHT/2-10,100,width=20,height=20)
         elif self.Islost:
@@ -162,7 +160,7 @@ class Attacker(sge.dsp.Object):
     def hurt(self,obj,dmage):
         self.health -= dmage
         if self.health <= 0:
-            sge.game.current_room.gold+=self.gold
+            sge.game.current_room.player.gold+=self.gold
             self.destroy()
             Float_gold.create(self.x,self.y,self.gold)
         else:
@@ -272,7 +270,7 @@ class Barrier(sge.dsp.Object):
                  DIRECTION_DOWN: other.y < self.y
                  }
                 if judge_dic[other.direction]:
-                    sge.game.current_room.lose()
+                    sge.game.current_room.player.life_hurt()
                     other.destroy()
 
 
@@ -307,14 +305,14 @@ class Defence(sge.dsp.Object):
         zmap = sge.game.current_room.zmap_info['zmap']
         i = int(self.y // MAP_SCALE)
         j = int(self.x // MAP_SCALE)
-        if zmap[i][j]==0 and sge.game.current_room.gold >= self.gold:
+        if zmap[i][j]==0 and sge.game.current_room.player.gold >= self.gold:
             #deploying
             self.image_alpha=255
             self.deployed = True
             self.searching_enemy = True
             self.x = j * MAP_SCALE + MAP_SCALE/2
             self.y = i * MAP_SCALE + MAP_SCALE/2
-            sge.game.current_room.gold -= self.gold
+            sge.game.current_room.player.gold -= self.gold
             snd_dead.play()
             # hidden FIELDS
             sge.game.current_room.deploying = None
@@ -439,6 +437,13 @@ class ControlBar(sge.dsp.Object):
         y = sge.game.height -controlBar_sprite.height
         super(ControlBar,self).__init__(0,y,50,sprite=controlBar_sprite)
         Skill.create(1,50,y,Dude)
+
+    def event_step(self,time_passed,delta_mult):
+        hud_sprite.draw_clear()
+        hud_sprite.draw_text(hud_font,'GOLD: '+str(sge.game.current_room.player.gold),0,0,color=sge.gfx.Color("white"))
+        hud_sprite.draw_text(hud_font,'REMAIN:' +str(sge.game.current_room.attacker_alive),0,20,color=sge.gfx.Color('white'))
+        hud_sprite.draw_text(hud_font,"LIFE:"+str(sge.game.current_room.player.life),0,40,color=sge.gfx.Color('white'))
+        sge.game.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
 
 
 class Skill(sge.dsp.Object):

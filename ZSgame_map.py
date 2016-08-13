@@ -10,7 +10,8 @@ Constants of the tags in map:
 7 : └    LEFT_UP
 8 : |    VERTICAL
 '''
-from ZSgame2_init import *
+#TODO add cross (+) style in maps
+from ZSgame_init import *
 
 # set customs_pass information
 customs_pass = []
