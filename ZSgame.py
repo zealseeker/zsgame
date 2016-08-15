@@ -157,8 +157,8 @@ class Attacker(sge.dsp.Object):
         super(Attacker,self).__init__(x,y,**kwargs)
         self.healthBar = AttackerHealthBar.create(self)
 
-    def hurt(self,obj,dmage):
-        self.health -= dmage
+    def hurt(self,obj,damage):
+        self.health -= damage
         if self.health <= 0:
             sge.game.current_room.player.gold+=self.gold
             self.destroy()
@@ -274,6 +274,116 @@ class Barrier(sge.dsp.Object):
                     other.destroy()
 
 
+class Magic(sge.dsp.Object):
+    deployed = False
+    attack_range = 150
+    magic_dict = {}
+
+    def __init__(self,*args,**kwarges):
+        self.show_range=True
+        self.magic_sprite = kwarges['sprite']
+        self.deployed=False
+        del kwarges['sprite']
+        super(Magic,self).__init__(*args,**kwarges)
+
+    def deploy(self):
+        self.sprite = self.magic_sprite
+        self.image_fps = self.sprite.fps
+        #self.image_xscale=0.1
+        #self.image_yscale=0.1
+        self.deployed=True
+        self.checks_collisions=True
+        sge.game.current_room.deploying = None
+        self.show_range = False
+        for obj in sge.game.current_room.objects[:]:
+            if isinstance(obj,Field):
+                obj.destroy()
+
+    def event_mouse_move(self,x,y):
+        if not self.deployed:
+            self.x = sge.game.mouse.x
+            self.y = sge.game.mouse.y
+
+    def event_mouse_button_press(self,button):
+
+        if not self.deployed:
+            if button=='left':
+                self.deploy()
+            elif button == 'right':
+                self.destroy()
+                sge.game.current_room.deploying=None
+                for obj in sge.game.current_room.objects[:]:
+                    if isinstance(obj,Field):
+                        obj.destroy()
+    def event_alarm(self,alarm_id):
+        if alarm_id == 'kill':
+            self.killed=False
+            self.tangible=True
+            self.alarms['pause']=5
+            print self.sprite.frames
+        elif alarm_id == 'pause':
+            self.tangible=False
+            self.attacted=[]
+            self.alarms['kill']=self.freq-5
+        if alarm_id == 'destroy':
+            print self.sprite.frames
+            self.destroy()
+
+    def event_step(self,time_passed,delta_mult):
+        if self.show_range:
+            sge.game.current_room.project_circle(self.x,self.y,50,self.attack_range,fill=RANGE_COLOR,outline=RANGE_OUTLINE_COLOR)
+
+    def event_animition_end(self):
+        print '1'
+
+class Leiyu(Magic):
+    attack_range = 30
+    gold = 10
+    name = 'leiyu'
+    freq = 48
+    life_cycle = 180
+    damage = 30
+    killed = False
+
+    def __init__(self,x,y):
+        self.attacted = []
+        super(Leiyu,self).__init__(x,y,51,sprite=magic_leiyu,tangible=False)
+        super(Leiyu,self).magic_dict['leiyu']=Leiyu
+
+    def deploy(self):
+        self.alarms['kill']=20 #before the killing
+        self.alarms['destroy']=self.life_cycle
+        super(Leiyu,self).deploy()
+
+    def event_collision(self,obj,xdirection,ydirection):
+        if isinstance(obj,Attacker) and obj not in self.attacted:
+            obj.hurt(self,self.damage)
+            self.attacted.append(obj)
+
+class MG_Cold(Magic):
+    attack_range = 50
+    gold = 10
+    name = 'cold'
+    freq = 10
+    life_cycle = 180
+
+    def __init__(self,x,y):
+        self.attacted = []
+        super(MG_Cold,self).__init__(x,y,51,sprite=magic_cold,tangible=False)
+        super(MG_Cold,self).magic_dict['leiyu']=Leiyu
+
+    def deploy(self):
+        self.alarms['kill']=3 #before the killing
+        self.alarms['destroy']=self.life_cycle
+        super(MG_Cold,self).deploy()
+
+    def event_collision(self,obj,xdirection,ydirection):
+        self.killed=True
+        if isinstance(obj,Attacker) and obj not in self.attacted:
+            obj.hurt(self,5)
+            self.attacted.append(obj)
+
+
 class Defence(sge.dsp.Object):
 
     deployed=False
@@ -380,7 +490,7 @@ class Bullet(sge.dsp.Object):
 
 class Arrow(Bullet):
     speed = 10
-    dmage = 20
+    damage = 20
     def __init__(self,x,y,obj):
         super(Arrow,self).__init__(obj,x,y,9,sprite=arrow_sprite)
         self.attacted = []
@@ -394,7 +504,7 @@ class Arrow(Bullet):
     def event_collision(self,obj,xdirection,ydirection):
         if isinstance(obj,Attacker):
             if obj not in self.attacted:
-                obj.hurt(self,self.dmage)
+                obj.hurt(self,self.damage)
                 self.attacted.append(obj)
 
     def event_step(self,time_passed, delta_mult):
@@ -437,6 +547,8 @@ class ControlBar(sge.dsp.Object):
         y = sge.game.height -controlBar_sprite.height
         super(ControlBar,self).__init__(0,y,50,sprite=controlBar_sprite)
         Skill.create(1,50,y,Dude)
+        Skill.create(2,50,y,Leiyu)
+        Skill.create(3,50,y,MG_Cold)
 
     def event_step(self,time_passed,delta_mult):
         hud_sprite.draw_clear()
@@ -455,19 +567,19 @@ class Skill(sge.dsp.Object):
         self.Origin = origin
         self.skillid = skillid
         self.selected = False
-        super(Skill,self).__init__(x,y,60,*args,sprite=skill_sprites[origin.name],**kwargs)
+        super(Skill,self).__init__(x,y,60,*args,sprite=skill_sprites[origin.name],tangible=False,**kwargs)
         self.sprite.draw_text(hud_font,str(skillid),self.skill_width-10,self.skill_width-20)
 
     def event_key_press(self,key, char):
-        if key in '123456':
+        if key == self.skillid:
             if sge.game.current_room.deploying:
                 sge.game.current_room.deploying.destroy()
                 sge.game.current_room.deploying = None
-            else:
+            elif isinstance(self.Origin,Defence):
                 create_fields(sge.game.current_room.zmap_info['zmap'])
         if key == str(self.skillid) and sge.game.current_room.processing:
             sge.game.current_room.deploying = self.Origin.create(sge.game.mouse.x,sge.game.mouse.y)
-        pass
+
     def event_mouse_move(self,x,y):
         x=sge.game.mouse.x
         y=sge.game.mouse.y
@@ -545,9 +657,16 @@ AttackerHealthBar_sprite = sge.gfx.Sprite(width=50,height=8,origin_x=25,origin_y
 red_border_sprite = sge.gfx.Sprite('red_border',DATA,origin_x=25,origin_y=25)
 AttackerHealthBar_sprite.draw_rectangle(0,0,50,8,outline=sge.gfx.Color('black'),fill=sge.gfx.Color('green'))
 hud_sprite  = sge.gfx.Sprite(width=100, height=80)
-skill_sprites = {'dude':dude_skill_sprite}
 selected_skill_sprite = sge.gfx.Sprite('selected',DATA,width=50,height=50)
 gold_sprite = sge.gfx.Sprite('gold',DATA,width=20,height=20)
+magic_leiyu = sge.gfx.Sprite('magic_leiyu',DATA,width=50,height=80,fps=10,origin_x=25,origin_y=60,bbox_y=-20)
+magic_cold = sge.gfx.Sprite('magic_cold',DATA,width=100,height=80,fps=12,origin_x=50,origin_y=50,bbox_y=-20)
+skill_magic_leiyu = sge.gfx.Sprite('red_border',DATA)
+skill_magic_leiyu.draw_sprite(sge.gfx.Sprite('magic_leiyu-4',DATA,width=47,height=47),0,0,0)
+skill_magic_cold = sge.gfx.Sprite('red_border',DATA)
+skill_magic_cold.draw_sprite(sge.gfx.Sprite('magic_cold-4',DATA,width=47,height=47),0,0,0)
+skill_sprites = {'dude':dude_skill_sprite,'leiyu':skill_magic_leiyu,'cold':skill_magic_cold}
+
 #load font
 hud_font = sge.gfx.Font("Arial", size=18)
 
