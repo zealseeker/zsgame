@@ -320,13 +320,11 @@ class Magic(sge.dsp.Object):
             self.killed=False
             self.tangible=True
             self.alarms['pause']=5
-            print self.sprite.frames
         elif alarm_id == 'pause':
             self.tangible=False
             self.attacted=[]
             self.alarms['kill']=self.freq-5
         if alarm_id == 'destroy':
-            print self.sprite.frames
             self.destroy()
 
     def event_step(self,time_passed,delta_mult):
@@ -541,7 +539,6 @@ class Field(sge.dsp.Object):
         super(Field,self).__init__(x,y,10,sprite=field_sprites[f_type],
         checks_collisions=False,tangible=False)
 
-
 class ControlBar(sge.dsp.Object):
     def __init__(self,room):
         y = sge.game.height -controlBar_sprite.height
@@ -557,7 +554,6 @@ class ControlBar(sge.dsp.Object):
         hud_sprite.draw_text(hud_font,"LIFE:"+str(sge.game.current_room.player.life),0,40,color=sge.gfx.Color('white'))
         sge.game.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
 
-
 class Skill(sge.dsp.Object):
     skill_width = 50
     def __init__(self,skillid,left,height,origin,*args,**kwargs):
@@ -571,11 +567,11 @@ class Skill(sge.dsp.Object):
         self.sprite.draw_text(hud_font,str(skillid),self.skill_width-10,self.skill_width-20)
 
     def event_key_press(self,key, char):
-        if key == self.skillid:
+        if key == str(self.skillid):
             if sge.game.current_room.deploying:
                 sge.game.current_room.deploying.destroy()
                 sge.game.current_room.deploying = None
-            elif isinstance(self.Origin,Defence):
+            elif issubclass(self.Origin,Defence): 
                 create_fields(sge.game.current_room.zmap_info['zmap'])
         if key == str(self.skillid) and sge.game.current_room.processing:
             sge.game.current_room.deploying = self.Origin.create(sge.game.mouse.x,sge.game.mouse.y)
@@ -618,8 +614,6 @@ class Float_gold(Float_obj):
             self.image_alpha -=10
         else:
             self.frame +=1
-
-
 
 def create_fields(zmap):
     for i,row in enumerate(zmap):
