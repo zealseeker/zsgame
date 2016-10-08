@@ -140,6 +140,7 @@ class Attacker(sge.dsp.Object):
 
     def __init__(self,x,y,direction,**kwargs):
         del kwargs['model']
+        kwargs['checks_collisions']=False
         if 'health' in kwargs:
             self.max_health = kwargs['health']
             del kwargs['health']
@@ -273,20 +274,31 @@ class Barrier(sge.dsp.Object):
                     sge.game.current_room.player.life_hurt()
                     other.destroy()
 
-
 class Magic(sge.dsp.Object):
     deployed = False
     attack_range = 150
     magic_dict = {}
 
     def __init__(self,*args,**kwarges):
-        self.show_range=True
+        self.show_range = True
         self.magic_sprite = kwarges['sprite']
-        self.deployed=False
+        self.deployed = False
+        self.display = True
         del kwarges['sprite']
         super(Magic,self).__init__(*args,**kwarges)
+    def show(self):
+        self.display = True
+        self.visible = True
+    def hide(self):
+        self.display = False
+        self.visible = False
 
     def deploy(self):
+        #check avaiability of deploying
+        # condition of deploy:
+        # 1. out of control bar:
+        if sge.game.current_room.controlBar.entered:
+            return False
         self.sprite = self.magic_sprite
         self.image_fps = self.sprite.fps
         #self.image_xscale=0.1
@@ -381,7 +393,6 @@ class MG_Cold(Magic):
             obj.hurt(self,5)
             self.attacted.append(obj)
 
-
 class Defence(sge.dsp.Object):
 
     deployed=False
@@ -391,9 +402,17 @@ class Defence(sge.dsp.Object):
 
     def __init__(self,*args,**kwarges):
         kwarges['image_alpha']=50
+        kwarges['tangible']=False
         self.show_range = True
+        self.display = True
         self.searching_enemy = False
         super(Defence,self).__init__(*args,**kwarges)
+    def show(self):
+        self.display = True
+        self.visible = True
+    def hide(self):
+        self.display = False
+        self.visible = False
 
     def kill(self,obj):
         self.killing_obj = obj
@@ -410,6 +429,11 @@ class Defence(sge.dsp.Object):
     def deploy(self):
         'now only consider size 1'
         #check avaiability of deploying
+        # condition of deploy:
+        # 1. out of control bar:
+        if sge.game.current_room.controlBar.entered:
+            return False
+        # 2. not in roads
         zmap = sge.game.current_room.zmap_info['zmap']
         i = int(self.y // MAP_SCALE)
         j = int(self.x // MAP_SCALE)
@@ -455,7 +479,7 @@ class Defence(sge.dsp.Object):
 
 
     def event_step(self, time_passed, delta_mult):
-        if self.show_range:
+        if self.show_range and self.display:
             sge.game.current_room.project_circle(self.x,self.y,50,self.attack_range,fill=RANGE_COLOR,outline=RANGE_OUTLINE_COLOR)
         if self.searching_enemy:
             if self.search_enemy():
@@ -491,7 +515,7 @@ class Arrow(Bullet):
     damage = 20
     def __init__(self,x,y,obj):
         super(Arrow,self).__init__(obj,x,y,9,sprite=arrow_sprite)
-        self.attacted = []
+        self.attacted = set()
 
     def attact(self,obj):
         self.angle = math.atan2(self.obj.y-self.y,self.obj.x-self.x)
@@ -503,7 +527,7 @@ class Arrow(Bullet):
         if isinstance(obj,Attacker):
             if obj not in self.attacted:
                 obj.hurt(self,self.damage)
-                self.attacted.append(obj)
+                self.attacted.add(obj)
 
     def event_step(self,time_passed, delta_mult):
         if self.bbox_bottom < 0 or self.bbox_top > sge.game.current_room.height \
@@ -540,19 +564,42 @@ class Field(sge.dsp.Object):
         checks_collisions=False,tangible=False)
 
 class ControlBar(sge.dsp.Object):
+    ' the panel of the game.'
     def __init__(self,room):
+        self.entered = False
+        self.temp_deploying = None
         y = sge.game.height -controlBar_sprite.height
         super(ControlBar,self).__init__(0,y,50,sprite=controlBar_sprite)
         Skill.create(1,50,y,Dude)
         Skill.create(2,50,y,Leiyu)
         Skill.create(3,50,y,MG_Cold)
+    def event_enter(self):
+        if sge.game.current_room.deploying:
+            sge.game.current_room.deploying.hide()
+        self.entered = True
+
+    def event_leave(self):
+        if sge.game.current_room.deploying:
+            sge.game.current_room.deploying.show()
+        self.entered = False
 
     def event_step(self,time_passed,delta_mult):
         hud_sprite.draw_clear()
         hud_sprite.draw_text(hud_font,'GOLD: '+str(sge.game.current_room.player.gold),0,0,color=sge.gfx.Color("white"))
         hud_sprite.draw_text(hud_font,'REMAIN:' +str(sge.game.current_room.attacker_alive),0,20,color=sge.gfx.Color('white'))
         hud_sprite.draw_text(hud_font,"LIFE:"+str(sge.game.current_room.player.life),0,40,color=sge.gfx.Color('white'))
+        hud_sprite.draw_text(hud_font,'FPS:'+str(1000/time_passed),0,60,color=sge.gfx.Color('white'))
         sge.game.project_sprite(hud_sprite,0,WINDOW_WIDTH-100,WINDOW_HEIGHT-80,60)
+    def event_mouse_move(self,x,y):
+        x = sge.game.mouse.x
+        y = sge.game.mouse.y
+        if y > self.y:
+            if not self.entered:
+                ## enter the panel
+                self.event_enter()
+        else :
+            if self.entered:
+                self.event_leave()
 
 class Skill(sge.dsp.Object):
     skill_width = 50
@@ -571,7 +618,7 @@ class Skill(sge.dsp.Object):
             if sge.game.current_room.deploying:
                 sge.game.current_room.deploying.destroy()
                 sge.game.current_room.deploying = None
-            elif issubclass(self.Origin,Defence): 
+            elif issubclass(self.Origin,Defence):
                 create_fields(sge.game.current_room.zmap_info['zmap'])
         if key == str(self.skillid) and sge.game.current_room.processing:
             sge.game.current_room.deploying = self.Origin.create(sge.game.mouse.x,sge.game.mouse.y)
@@ -634,7 +681,7 @@ def create_fields(zmap):
 def distance(x1,y1,x2,y2):
     return math.sqrt((x1-x2)**2+(y1-y2)**2)
 
-Game(width=WINDOW_WIDTH,height=WINDOW_HEIGHT,scale=1,fps=60,delta=True,window_text='Zealseeker Game {}'.format(__version__),
+Game(width=WINDOW_WIDTH,height=WINDOW_HEIGHT,scale=1,fps=60,delta=True,delta_max=100,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # state model
 AttackerDict = {'Badguy':Badguy}
