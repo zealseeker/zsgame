@@ -135,7 +135,6 @@ class Scene(sge.dsp.Room):
         elif self.Islost:
             self.project_text(hud_font,'Input Enter to start again!',WINDOW_WIDTH/2-100,WINDOW_HEIGHT/2-10,100,width=200,height=20)
 
-
 class Attacker(sge.dsp.Object):
 
     def __init__(self,x,y,direction,**kwargs):
@@ -145,6 +144,7 @@ class Attacker(sge.dsp.Object):
             self.max_health = kwargs['health']
             del kwargs['health']
         if 'speed'  in kwargs:
+            self.normal_speed = kwargs['speed']
             self.speed = kwargs['speed']
             del kwargs['speed']
         if 'gold' in kwargs:
@@ -157,6 +157,7 @@ class Attacker(sge.dsp.Object):
         self.health = self.max_health
         super(Attacker,self).__init__(x,y,**kwargs)
         self.healthBar = AttackerHealthBar.create(self)
+        self.effects = {}
 
     def hurt(self,obj,damage):
         self.health -= damage
@@ -207,10 +208,14 @@ class Attacker(sge.dsp.Object):
     def event_destroy(self):
         sge.game.current_room.myevent_attacker_destroy(self)
         self.healthBar.destroy()
+    def event_step(self,time_passed,delta_mult):
+        effects = self.effects.keys()
+        for effect in effects:
+            self.effects[effect].process()
 
 class Badguy(Attacker):
     health = 100
-    speed = 2
+    speed = 1
     gold = 0
     def __init__(self,x,y,direction,**kwargs):
         self.max_health = self.health
@@ -346,12 +351,44 @@ class Magic(sge.dsp.Object):
     def event_animition_end(self):
         print '1'
 
+class Effect:
+    def __init__(self,obj):
+        self.obj = obj
+    def process(self):
+        if self.remain == 1:
+            self.destroy()
+        else:
+            self.remain -= 1
+
+class Speed_reduce(Effect):
+    '''
+    reduce_type 0:rate (100%)   1:real number
+    '''
+    name = 'Speed_reduce'
+    def __init__(self,obj,value,period,reduce_type=0):
+        self.obj = obj
+        self.reduce_type = reduce_type
+        self.value = value
+        self.period = period
+        self.remain = period
+        self.affect()
+
+    def destroy(self):
+        del self.obj.effects[self.name]
+        if self.reduce_type==0:
+            self.obj.set_speed(self.obj.speed * 100.0/(100-self.value))
+
+    def affect(self):
+        if self.reduce_type==0:
+            self.obj.set_speed(self.obj.speed * (100-self.value) / 100.0)
+
+
 class Leiyu(Magic):
     attack_range = 30
     gold = 10
     name = 'leiyu'
     freq = 48
-    life_cycle = 180
+    life_cycle = 400
     damage = 30
     killed = False
 
@@ -371,12 +408,12 @@ class Leiyu(Magic):
             self.attacted.append(obj)
 
 class MG_Cold(Magic):
-    attack_range = 50
+    attack_range = 40
     gold = 10
     name = 'cold'
     freq = 10
     life_cycle = 180
-
+    reduce_value = 40
     def __init__(self,x,y):
         self.attacted = []
         super(MG_Cold,self).__init__(x,y,51,sprite=magic_cold,tangible=False)
@@ -389,9 +426,10 @@ class MG_Cold(Magic):
 
     def event_collision(self,obj,xdirection,ydirection):
         self.killed=True
-        if isinstance(obj,Attacker) and obj not in self.attacted:
-            obj.hurt(self,5)
-            self.attacted.append(obj)
+        if isinstance(obj,Attacker) and 'Speed_reduce' not in obj.effects:
+            #obj.hurt(self,5)
+            obj.effects['Speed_reduce']=Speed_reduce(obj,self.reduce_value,100)
+
 
 class Defence(sge.dsp.Object):
 
@@ -511,7 +549,7 @@ class Bullet(sge.dsp.Object):
         self.attact(self.obj)
 
 class Arrow(Bullet):
-    speed = 10
+    speed = 5
     damage = 20
     def __init__(self,x,y,obj):
         super(Arrow,self).__init__(obj,x,y,9,sprite=arrow_sprite)
@@ -681,7 +719,7 @@ def create_fields(zmap):
 def distance(x1,y1,x2,y2):
     return math.sqrt((x1-x2)**2+(y1-y2)**2)
 
-Game(width=WINDOW_WIDTH,height=WINDOW_HEIGHT,scale=1,fps=60,delta=True,delta_max=100,window_text='Zealseeker Game {}'.format(__version__),
+Game(width=WINDOW_WIDTH,height=WINDOW_HEIGHT,scale=1,fps=60,delta=True,window_text='Zealseeker Game {}'.format(__version__),
      window_icon=None)
 # state model
 AttackerDict = {'Badguy':Badguy}
@@ -701,11 +739,11 @@ hud_sprite  = sge.gfx.Sprite(width=100, height=80)
 selected_skill_sprite = sge.gfx.Sprite('selected',DATA,width=50,height=50)
 gold_sprite = sge.gfx.Sprite('gold',DATA,width=20,height=20)
 magic_leiyu = sge.gfx.Sprite('magic_leiyu',DATA,width=50,height=80,fps=10,origin_x=25,origin_y=60,bbox_y=-20)
-magic_cold = sge.gfx.Sprite('magic_cold',DATA,width=100,height=80,fps=12,origin_x=50,origin_y=50,bbox_y=-20)
+magic_cold = sge.gfx.Sprite('magic_cold',DATA,width=100,height=80,fps=6,origin_x=50,origin_y=40,bbox_y=-20)
 skill_magic_leiyu = sge.gfx.Sprite('red_border',DATA)
 skill_magic_leiyu.draw_sprite(sge.gfx.Sprite('magic_leiyu-4',DATA,width=47,height=47),0,0,0)
 skill_magic_cold = sge.gfx.Sprite('red_border',DATA)
-skill_magic_cold.draw_sprite(sge.gfx.Sprite('magic_cold-4',DATA,width=47,height=47),0,0,0)
+skill_magic_cold.draw_sprite(sge.gfx.Sprite('magic_cold-6',DATA,width=47,height=47,),0,0,0)
 skill_sprites = {'dude':dude_skill_sprite,'leiyu':skill_magic_leiyu,'cold':skill_magic_cold}
 
 #load font
